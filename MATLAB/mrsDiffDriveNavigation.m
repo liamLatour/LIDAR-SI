@@ -94,9 +94,9 @@ for idx = 2:numel(tVec)
         pose(:,idx) = pose(:,idx-1) + vel*sampleTime;
     elseif currentState == "blind"
         % Go to the dark direction
-        %diffe = waypoint(3)-pose(3,idx-1);
-        %pose(3,idx) = mod(pose(3,idx-1) + max(min(diffe, controller.MaxAngularVelocity/10), -controller.MaxAngularVelocity/10), 2*pi);
-        pose(3,idx) = pose(3,idx-1);
+        diffe = mod(waypoint(3), 2*pi)-mod(pose(3,idx-1), 2*pi);
+        pose(3,idx) = pose(3,idx-1) + max(min(diffe, controller.MaxAngularVelocity/13), -controller.MaxAngularVelocity/13);
+        %pose(3,idx) = pose(3,idx-1);
         pose(1:2,idx) = pose(1:2,idx-1) + (pol2car([controller.DesiredLinearVelocity pose(3,idx-1)])*sampleTime)';
     elseif currentState == "start"
         pose(:,idx) = pose(:,idx-1);
@@ -172,7 +172,7 @@ for idx = 2:numel(tVec)
         
          % Check it really needs this
         if pdist([waypoint(1:2); pose(1:2,idx)']) < 0.5
-            pose(3,idx) = waypoint(3);
+            %pose(3,idx) = waypoint(3);
             currentState = "blind";
         else        
             % Create a Probabilistic Road Map (PRM)
@@ -211,7 +211,7 @@ for idx = 2:numel(tVec)
             if erased
                 currentState = "start";
             else
-                pose(3,idx) = waypoint(3);
+                %pose(3,idx) = waypoint(3);
                 currentState = "blind";
             end
         end
