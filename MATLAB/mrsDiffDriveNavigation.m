@@ -13,6 +13,7 @@
 % - Repeats
 
 close all
+rng(0);
 
 %% Define Vehicle
 R = 0.1;                % Wheel radius [m]
@@ -29,7 +30,7 @@ lidar.maxRange = 4;
 sampleTime = 0.1;             % Sample time [s]
 tVec = 0:sampleTime:500;         % Time array
 
-initPose = [10;10;3*pi/2];      % Initial pose (x y theta)
+initPose = [10; 10; pi];      % Initial pose (x y theta)
 pose = zeros(3,numel(tVec));    % Pose matrix
 pose(:,1) = initPose;
 
@@ -73,22 +74,28 @@ ax4 = subplot(2, 2, 3);
 %set(gcf, 'Units', 'Normalized', 'OuterPosition', [0, 0, 1, 1]);
 
 %subplot(2, 2, 3)
-barGraph = bar(ax4, ranges);
+%barGraph = bar(ax4, zeros(182));
 
 %% Variables for the discovery code
-diseredAngle = pi/2;
+diseredAngle = pi+0.7;
 safeAngle = 10;
-currentState = "obstacle";
+currentState = "start";
+obstacleAvoidance = false;
 waypoints = [];
 
 %% Simulation loop
 r = robotics.Rate(1/sampleTime);
-for idx = 2:numel(tVec) 
+for idx = 2:numel(tVec)     
     %% Part about moving
     if currentState == "obstacle"
-        diffe = mod(diseredAngle, 2*pi)-mod(pose(3,idx-1), 2*pi);
-        pose(3,idx) = pose(3,idx-1) + max(min(diffe, controller.MaxAngularVelocity/20), -controller.MaxAngularVelocity/20);
-        pose(1:2,idx) = pose(1:2,idx-1) + (pol2car([controller.DesiredLinearVelocity pose(3,idx-1)])*sampleTime)';
+        diffe = mod(diseredAngle-pose(3,idx-1), 2*pi);
+        
+        if diffe > pi
+           diffe = diffe - 2*pi;
+        end
+        
+        pose(3,idx) = mod(pose(3,idx-1) + min(max(diffe, -controller.MaxAngularVelocity/13), controller.MaxAngularVelocity/13), 2*pi);
+        pose(1:2,idx) = pose(1:2,idx-1) + (pol2car([controller.DesiredLinearVelocity pose(3,idx)])*sampleTime)';        
     elseif currentState == "pursuit"
         % Run the Pure Pursuit controller and convert output to wheel speeds
         [vRef,wRef] = controller(pose(:,idx-1));
@@ -103,9 +110,13 @@ for idx = 2:numel(tVec)
         pose(:,idx) = pose(:,idx-1) + vel*sampleTime;
     elseif currentState == "blind"
         % Go to the dark direction
-        diffe = mod(waypoint(3), 2*pi)-mod(pose(3,idx-1), 2*pi);
-        pose(3,idx) = pose(3,idx-1) + max(min(diffe, controller.MaxAngularVelocity/13), -controller.MaxAngularVelocity/13);
-        %pose(3,idx) = pose(3,idx-1);
+        diffe = mod(waypoint(3)-pose(3,idx-1), 2*pi);
+        
+        if diffe > pi
+           diffe = diffe - 2*pi;
+        end
+        
+        pose(3,idx) = mod(pose(3,idx-1) + min(max(diffe, -controller.MaxAngularVelocity/13), controller.MaxAngularVelocity/13), 2*pi);        
         pose(1:2,idx) = pose(1:2,idx-1) + (pol2car([controller.DesiredLinearVelocity pose(3,idx-1)])*sampleTime)';
     elseif currentState == "start"
         pose(:,idx) = pose(:,idx-1);
@@ -151,7 +162,6 @@ for idx = 2:numel(tVec)
     end
     
     % Display everything
-    
     figure(myFigure);
     
     if size(knownHoles, 1) > 0
@@ -161,17 +171,22 @@ for idx = 2:numel(tVec)
         %plot(cartesian(:, 1) , cartesian(:, 2) , '.');
     end
     
-    if currentState == "obstacle"
+    if obstacleAvoidance == true || currentState == "obstacle"
+        %show(knownMap, "Parent", ax2);
+        %show(wallsMap, "Parent", ax3);
+        
+        nbScans = floor((length(lidar.scanAngles)+1)/2)*2;
+        
         fours = ones(length(ranges), 1) * 4.1;
         temp = (fours-ranges)*50;
-        splitMerge = [temp(91:length(temp)); temp(1:91)];
-        splitMerge(splitMerge < 150) = 0;
+        splitMerge = [temp(nbScans/2:length(temp)); temp(1:nbScans/2)];
         
         % Check it can continue forward
         canContinue = true;
         for i = -safeAngle/2 : safeAngle/2
-            if splitMerge(91 + i) > 0
+            if splitMerge(nbScans/2 + i) > 150
                 canContinue = false;
+                disp("NOPE");
                 break;
             end
         end
@@ -179,13 +194,15 @@ for idx = 2:numel(tVec)
         if canContinue == false
             % find closest available spot
             newAngleIndex = -1;
-            
+            %{ 
+            % Old method, ineficient (constantly O(n))
             lastCheck = false;
             nbGood = 0;
             for i = 1 : length(splitMerge)
-                if splitMerge(i) == 0
+                if splitMerge(i) < 150
                     if lastCheck == true
-                        if abs(91-i) < abs(91-newAngleIndex)
+                        
+                        if abs(91-(i-safeAngle/2)) < abs(91-newAngleIndex)
                             newAngleIndex = i-safeAngle/2;
                         end
                     else
@@ -193,7 +210,7 @@ for idx = 2:numel(tVec)
                             nbGood = nbGood + 1;
                         else
                             lastCheck = true;
-                            if abs(91-i) < abs(91-newAngleIndex)
+                            if abs(91-(i-safeAngle/2)) < abs(91-newAngleIndex)
                                 newAngleIndex = i-safeAngle/2;
                             end
                         end
@@ -203,26 +220,54 @@ for idx = 2:numel(tVec)
                     lastCheck = false;
                 end
             end
+            %}
             
-            splitMerge(newAngleIndex) = 100;
-            set(barGraph, 'ydata', splitMerge);
+            % New method (worst O(n), best O(2*safeAngle))
+            nbGood = 0;
+            for i = (length(splitMerge)+safeAngle)/2 : length(splitMerge)
+                if splitMerge(i) < 150
+                    nbGood = nbGood + 1;
+                    if nbGood == safeAngle
+                        newAngleIndex = i-safeAngle/2;
+                        break
+                    end
+                else
+                    nbGood = 0;
+                end
+            end
+            if newAngleIndex == -1
+                newAngleIndex = nbScans;
+            end
+            nbGood = 0;
+            for i = (length(splitMerge)-safeAngle)/2 : -1 : nbScans-newAngleIndex-safeAngle/2
+                if splitMerge(i) < 150
+                    nbGood = nbGood + 1;
+                    if nbGood == safeAngle
+                        newAngleIndex = i+safeAngle/2;
+                        break
+                    end
+                else
+                    nbGood = 0;
+                end
+            end
             
-            foundAngle = deg2rad(2*newAngleIndex);
-            disp(foundAngle);
+            splitMerge(newAngleIndex) = 250;
+            barGraph = bar(ax4, splitMerge, 1);
+            foundAngle = deg2rad(2*(newAngleIndex-nbScans/2));
             
-            % found angle - robot orientation (to have it in absolute)
-            diseredAngle = foundAngle - pose(3,idx) + pi;
+            diseredAngle = foundAngle + pose(3,idx);
         end
-    elseif currentState == "start" && size(knownHoles, 1) > 0
+    end
+        
+    if currentState == "start" && size(knownHoles, 1) > 0
         show(knownMap, "Parent", ax2);
         show(wallsMap, "Parent", ax3);
         grid(ax3, 'on')
         set(ax3,'XTick',0:1:14,'YTick',0:1:14);
-        hold on
         
         % Inflate
         oldMap = copy(knownMap);
-        inflate(knownMap,R);
+        inflate(knownMap,0.3);
             
         % Chose a waypoint
         newCurrentHole = currentHole;
@@ -256,8 +301,8 @@ for idx = 2:numel(tVec)
         else        
             % Create a Probabilistic Road Map (PRM)
             planner = robotics.PRM(knownMap);
-            planner.NumNodes = 75;
-            planner.ConnectionDistance = 7;
+            planner.NumNodes = 50;
+            %planner.ConnectionDistance = 7;
 
             % Find a path from the start point to a specified goal point
             startPoint = pose(1:2,idx)';
