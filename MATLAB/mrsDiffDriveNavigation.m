@@ -269,7 +269,7 @@ for idx = 2:numel(tVec)
         oldMap = copy(knownMap);
         inflate(knownMap,0.3);
             
-        % Chose a waypoint
+        % Choose a waypoint
         newCurrentHole = currentHole;
         waypoint = -1;
         
