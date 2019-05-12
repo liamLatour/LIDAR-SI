@@ -7,7 +7,6 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.finder.bi_a_star import BiAStarFinder
 from pathfinding.core.grid import Grid
 
-# TODO let the robot leave a trace
 
 # General function to translate from polar to cartesian
 def polToCar(center, dist, angle):
@@ -47,11 +46,12 @@ class Robot:
         self.mode = "START"             # can be "DISCOVER" or "STOP"
         self.path = None                # the current path it has to follow (using A*)
         self.whereInPath = 0         
-        self.angleResolution = 4        # number of degrees between 2 rays
+        self.angleResolution = 1        # number of degrees between 2 rays
         self.safeAngle = int(12 / self.angleResolution)
         self.knownHoles = []
         self.waypoint = -1
-        self.blindDistance = 1.5*scaleSize
+        self.blindDistance = 1*scaleSize
+        self.offset = 1
 
     # Used to draw a line on the map
     def line(self, center, radius, angle, lineColor=1):
@@ -66,22 +66,12 @@ class Robot:
 
         return float('inf') # To be sure not to mistaken with real hits
 
-    # Supposed to increase the size of the unknown parts to keep a safe distance from walls
-    def inflateMap(self, radius):
-        binaryGrid = (self.knownMap < 1).nonzero()
-        inflated = np.zeros((len(self.realMap), len(self.realMap)), dtype=int)+1
-
-        for black in range(len(binaryGrid[0])):
-            inflated = point((binaryGrid[0][black], binaryGrid[1][black]), radius, -1, inflated)
-
-        return inflated
-
     # Used to find a path between itself and the clicked point (A*)
     def FindPath(self, destination, manual):
         if manual:
             self.waypoint = -1
 
-        grid = Grid(matrix = self.inflateMap(3))
+        grid = Grid(matrix = self.knownMap)
 
         start = grid.node(self.position[1], self.position[0])
         end = grid.node(destination[0], destination[1])
@@ -96,7 +86,7 @@ class Robot:
             self.path = [(self.position[1], self.position[0])]
             self.whereInPath = 0
             self.mode = "FOLLOW"
-            print("Path is empty")
+            #print("Path is empty")
 
     def LIDAR(self):
         hasBeenNan = False
@@ -113,10 +103,9 @@ class Robot:
             else:
                 if hasBeenNan != False:
                     newAngle = (((angle+hasBeenNan)/2.0)/360.0) * 2*pi
-                    #print(newAngle/(2*pi)*360)
-                    voidCheck = polToCar(self.position, self.lineOfSight, newAngle)
+                    voidCheck = polToCar(self.position, self.lineOfSight+self.offset, newAngle)
 
-                    if voidCheck[0] >= 0 and voidCheck[0] < len(self.knownMap) and voidCheck[1] >= 0 and voidCheck[1] < len(self.knownMap) and self.knownMap[voidCheck[0]][voidCheck[1]] == -1:
+                    if voidCheck[0] >= 0 and voidCheck[0] < len(self.knownMap) and voidCheck[1] >= 0 and voidCheck[1] < len(self.knownMap) and self.knownMap[voidCheck[0]][voidCheck[1]] == -1 and self.realMap[voidCheck[0]][voidCheck[1]][0] >= 1:
                         self.knownHoles.append((self.position, newAngle))
 
                     hasBeenNan = False                
@@ -127,19 +116,19 @@ class Robot:
         return distances
 
     def obstacleAvoidance(self, distances):
-        print(self.mode)
+        #print(self.mode)
         if self.mode == "START":
             # Clean up and choose waypoint
             self.waypoint = -1
 
             if len(self.knownHoles) == 1:
-                print("only one")
+                #print("only one")
                 self.waypoint = 0
             else:
                 for i in range(len(self.knownHoles)-1, -1, -1):
-                    hole = polToCar(self.knownHoles[i][0], self.lineOfSight, self.knownHoles[i][1])
+                    hole = polToCar(self.knownHoles[i][0], self.lineOfSight+self.offset, self.knownHoles[i][1])
 
-                    if self.knownMap[hole[0]][hole[1]] >= 0:
+                    if self.knownMap[hole[0]][hole[1]] > -1:
                         del self.knownHoles[i]
                         self.waypoint -= 1
                     elif self.knownMap[self.knownHoles[i][0][0]][self.knownHoles[i][0][1]] >= 1:
@@ -152,19 +141,18 @@ class Robot:
                         self.waypoint -= 1
 
             if self.waypoint < 0 or self.knownHoles[self.waypoint] == []:
-                print("no more waypoints")
+                #print("no more waypoints")
                 self.mode = "DISCOVER"
                 return
 
-            print(self.knownHoles[self.waypoint][0])
-
             # Check it needs to move
-            if pdist(self.knownHoles[self.waypoint][0], self.position) < 0.5:
+            if pdist(self.knownHoles[self.waypoint][0], self.position) < 5:
                 self.mode = "BLIND"
             else:
-                self.FindPath(self.knownHoles[self.waypoint][0], False) # self.mode = "FOLLOW"
+                self.FindPath((self.knownHoles[self.waypoint][0][1], self.knownHoles[self.waypoint][0][0]), False) # self.mode = "FOLLOW"
 
         elif self.mode == "BLIND":
+            #print(self.knownHoles[self.waypoint][1])
             oldPos = self.position
             self.position = polToCar(self.position, self.speed, self.knownHoles[self.waypoint][1])
             self.orientation = atan2(self.position[1]-oldPos[1], self.position[0]-oldPos[0])
@@ -224,7 +212,7 @@ class Robot:
                     # Quick cleanUp && check if mine is erased
                     erased = False
                     for i in range(len(self.knownHoles)-1, -1, -1):      
-                        hole = polToCar(self.knownHoles[i][0], self.lineOfSight, self.knownHoles[i][1])
+                        hole = polToCar(self.knownHoles[i][0], self.lineOfSight+self.offset, self.knownHoles[i][1])
                         if self.knownMap[hole[0]][hole[1]] >= 0:
                             if i == self.waypoint:
                                 erased = True

@@ -1,6 +1,5 @@
 from math import floor
 import numpy as np
-import random
 import time
 
 import matplotlib.animation as animation
@@ -11,13 +10,11 @@ import matplotlib.pylab as lab
 import robot
 
 trace = []
-lastTrace = 0
 
 # Main loop of the program
 def updatefig(i):
     global barGraph
     global myRobot
-    global lastTrace
     global trace
 
     curentFrame = myRobot.move() # Asks for the next move of the robot
@@ -27,16 +24,15 @@ def updatefig(i):
 
     mine = np.copy(curentFrame[0])
     for hole in curentFrame[2]:
-        pos = robot.polToCar(hole[0], 2*40, hole[1])
+        pos = robot.polToCar(hole[0], 2.3*40+1, hole[1])
         mine[pos[0]][pos[1]] = 3
 
-    if lastTrace % 2 == 0:
-        trace.append(curentFrame[3])
+    
+    trace.append(curentFrame[3])
 
     for pos in trace:
         mine[pos[0]][pos[1]] = 2
 
-    lastTrace += 1
     im.set_array(mine) # Displays the map with the robot position
 
     return patches
@@ -51,14 +47,14 @@ def onclick(event):
 # To animate
 #os.chdir("C:\\Users\\Programming\\Desktop\\LIDAR-SI\\animated")
 
-realMap = lab.imread('Map.png') # Loads the image of the map
+realMap = lab.imread('aurelien.png') # Loads the image of the map
 scaleSize = 40 # Number of pixels for 1 meter
 
-period = 100 # Inverse of speed (time between 2 frames)
-myRobot = robot.Robot(2*scaleSize, 4, realMap, scaleSize) # Declares the Robot instance
+period = 20 # Inverse of speed (time between 2 frames)
+myRobot = robot.Robot(2.3*scaleSize, 4, realMap, scaleSize) # Declares the Robot instance
 
 # Generates the figures
-cmap = mplColors.ListedColormap(['black','blue','grey','red', 'yellow']) # All the used colors
+cmap = mplColors.ListedColormap(['black','blue','grey','red', 'white']) # All the used colors
 norm = mplColors.BoundaryNorm([    -1,     0,     1,     2,      3,    4], cmap.N) # Maps the colors to ints
 fig = plt.figure()
 fig.canvas.mpl_connect('button_press_event', onclick) # Binds the double click to the map
