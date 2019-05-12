@@ -47,7 +47,7 @@ def onclick(event):
 # To animate
 #os.chdir("C:\\Users\\Programming\\Desktop\\LIDAR-SI\\animated")
 
-realMap = lab.imread('aurelien.png') # Loads the image of the map
+realMap = lab.imread('Map.png') # Loads the image of the map
 scaleSize = 40 # Number of pixels for 1 meter
 
 period = 20 # Inverse of speed (time between 2 frames)
