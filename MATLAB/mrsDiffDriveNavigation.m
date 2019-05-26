@@ -65,7 +65,7 @@ attachLidarSensor(viz,lidar);
 
 %% Initialize figures
 myFigure = figure('Name','Maps', 'NumberTitle','off');
-figure(myFigure);
+%figure(myFigure);
 ax1 = subplot(2, 2, 1);
 ax2 = subplot(2, 2, 2);
 ax3 = subplot(2, 2, 4);
@@ -82,6 +82,9 @@ safeAngle = 10;
 currentState = "start";
 obstacleAvoidance = false;
 waypoints = [];
+
+canGo = 0;
+
 
 %% Simulation loop
 r = robotics.Rate(1/sampleTime);
@@ -162,7 +165,7 @@ for idx = 2:numel(tVec)
     end
     
     % Display everything
-    figure(myFigure);
+    %figure(myFigure);
     
     if size(knownHoles, 1) > 0
         distance = [];
@@ -350,4 +353,14 @@ for idx = 2:numel(tVec)
     viz(pose(:,idx), waypoints, ranges);
     
     waitfor(r);
+    
+    if canGo == 0
+        while waitforbuttonpress == 0
+            continue;
+        end
+        canGo = canGo+1;
+    elseif canGo == 1
+        waitforbuttonpress
+        canGo = canGo+1;
+    end
 end
