@@ -1,0 +1,44 @@
+#:kivy 1.10.1
+
+<UI>:
+    id: ui
+    orientation:'vertical'
+    ActionBar:
+        pos_hint: {'top':1}
+        ActionView:
+            use_separator: True
+            ActionPrevious:
+                title: 'Lidar'
+                with_previous: False
+                #app_icon: 'assets\logoDark.ico'
+            ActionButton:
+                id: port_button
+                text: 'Port'
+                on_release: root.show_port()
+            ActionButton:
+                text: 'Option'
+                on_release: app.open_settings()
+
+    FloatLayout:
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint: (.2, .2)
+            pos: (0, root.height-self.height-50)
+            Label:
+                text: 'Motor'
+            Switch:
+                id: motorSwitch
+                active: False
+            Slider:
+                id: motorSpeed
+                min: 3
+                max: 254
+                value: 10
+                step: 1
+                orientation: 'horizontal'
+        Widget:
+            id: libreDrawing
+            on_touch_down: root.clickedDown(args[1])
+            on_touch_up: root.clickedUp(args[1])
+            on_touch_move: root.clickedMove(args[1])
+            canvas.before:

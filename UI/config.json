@@ -1,0 +1,12 @@
+[{
+        "type": "title",
+        "title": "General"
+    },
+    {
+        "type": "numeric",
+        "title": "Motor speed",
+        "desc": "The speed of the motor in rad/sec",
+        "section": "general",
+        "key": "speed"
+    }
+]
